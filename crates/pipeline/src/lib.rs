@@ -605,7 +605,7 @@ fn render_impl(src: Src<'_>, info: &SourceInfo, s: &DevelopSettings, req: &Rende
         return Rendered { image, histogram, deep: Some(deep) };
     }
     let mut image = finish::finish(&prep, s, frame, info, req.space, req.display.as_ref(), req.proof);
-    if edit.led_banding.enabled && edit.led_banding.preview && req.overlay == Overlay::None {
+    if edit.led_banding.enabled && req.overlay == Overlay::None {
         led_banding::correct(&mut image, edit.led_banding);
     }
     lap("finish", &mut t);
