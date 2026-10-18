@@ -1,9 +1,9 @@
 //! Row-profile based correction for horizontal LED flicker/banding in rendered images.
 //!
 //! Operates on display-encoded RGBA output so it applies to JPEG-ready renders. It estimates a
-//! robust per-row luminance and chroma profile, smooths that profile vertically, then attenuates
-//! row deviations. This is a conservative single-frame heuristic: real horizontal stage lighting
-//! can resemble banding, so strengths are user-adjustable and the feature is off by default.
+//! per-row luminance and chroma profile, smooths that profile vertically, then corrects row
+//! deviations with a nonlinear strength curve. This is a single-frame heuristic: real horizontal
+//! stage lighting can resemble banding, so strengths are user-adjustable and the feature is off by default.
 use lightcraft_develop::LedBanding;
 use lightcraft_raster::Rgba8;
 
@@ -52,8 +52,11 @@ pub fn correct(image: &mut Rgba8, settings: LedBanding) {
     for y in 0..h {
         let source_l = lum[y];
         let target_l = smooth_lum[y];
+        // Apply correction in log space with a stronger response at high slider values.
+        // The old linear interpolation often left visible LED stripes even at 100%.
         let l_gain = if source_l > 1.0 / 255.0 && target_l.is_finite() {
-            (1.0 + ((target_l / source_l).clamp(0.5, 2.0) - 1.0) * lum_strength).clamp(0.5, 2.0)
+            let ratio = (target_l / source_l).clamp(0.5, 2.0);
+            ratio.powf(lum_strength * 2.0).clamp(0.25, 4.0)
         } else { 1.0 };
         let mut gains = [1.0f32; 3];
         if color_strength > 0.0 {
@@ -61,7 +64,8 @@ pub fn correct(image: &mut Rgba8, settings: LedBanding) {
                 let src = chroma[y][k];
                 let target = smooth_ch[k][y];
                 if src > 2.0 / 255.0 && target.is_finite() {
-                    gains[k] = (1.0 + ((target / src).clamp(0.7, 1.4) - 1.0) * color_strength).clamp(0.7, 1.4);
+                    // Amplify the estimated channel correction too, while keeping it bounded.
+                    gains[k] = (target / src).clamp(0.7, 1.4).powf(color_strength * 1.8).clamp(0.5, 2.0);
                 }
             }
             // Colour correction should not double-apply luminance correction.
