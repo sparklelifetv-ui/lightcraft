@@ -40,7 +40,7 @@ pub fn correct(image: &mut Rgba8, settings: LedBanding) {
         let lo = y.saturating_sub(radius);
         let hi = (y + radius + 1).min(h);
         let mut sum = 0.0;
-        let mut n = 0.0;
+        let mut n = 0.0f32;
         for &v in &profile[lo..hi] { sum += v; n += 1.0; }
         sum / n.max(1.0)
     };
