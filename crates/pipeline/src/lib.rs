@@ -605,8 +605,8 @@ fn render_impl(src: Src<'_>, info: &SourceInfo, s: &DevelopSettings, req: &Rende
         return Rendered { image, histogram, deep: Some(deep) };
     }
     let mut image = finish::finish(&prep, s, frame, info, req.space, req.display.as_ref(), req.proof);
-    if edit.led_banding.enabled && req.overlay == Overlay::None {
-        led_banding::correct(&mut image, edit.led_banding);
+    if s.led_banding.enabled && req.overlay == Overlay::None {
+        led_banding::correct(&mut image, s.led_banding);
     }
     lap("finish", &mut t);
     let cut = |i: &Rgba8| match plan.keep {
