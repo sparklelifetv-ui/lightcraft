@@ -31,6 +31,7 @@ pub mod dust;
 pub mod finish;
 pub mod geometry;
 pub mod local;
+pub mod led_banding;
 pub mod local_tone;
 pub mod lut;
 pub mod masks;
@@ -603,7 +604,10 @@ fn render_impl(src: Src<'_>, info: &SourceInfo, s: &DevelopSettings, req: &Rende
         lap("finish (deep)", &mut t);
         return Rendered { image, histogram, deep: Some(deep) };
     }
-    let image = finish::finish(&prep, s, frame, info, req.space, req.display.as_ref(), req.proof);
+    let mut image = finish::finish(&prep, s, frame, info, req.space, req.display.as_ref(), req.proof);
+    if edit.led_banding.enabled && edit.led_banding.preview && req.overlay == Overlay::None {
+        led_banding::correct(&mut image, edit.led_banding);
+    }
     lap("finish", &mut t);
     let cut = |i: &Rgba8| match plan.keep {
         Some(k) => i.crop(k.x, k.y, k.w, k.h),
