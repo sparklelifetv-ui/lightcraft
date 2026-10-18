@@ -188,8 +188,6 @@ impl Default for DevelopSettings {
 pub struct LedBanding {
     /// Run automatic horizontal-band estimation and correction.
     pub enabled: bool,
-    /// Show the corrected rendition in preview/export; off is a quick before comparison.
-    pub preview: bool,
     /// Correct row-to-row luminance changes.
     pub luminance: f64,
     /// Correct row-to-row colour shifts.
@@ -200,7 +198,7 @@ pub struct LedBanding {
 
 impl Default for LedBanding {
     fn default() -> Self {
-        Self { enabled: false, preview: true, luminance: 70.0, color: 50.0, band_width: 12 }
+        Self { enabled: false, luminance: 70.0, color: 50.0, band_width: 12 }
     }
 }
 
