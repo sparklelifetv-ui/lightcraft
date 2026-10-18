@@ -89,7 +89,7 @@ mod tests {
             let v = if y % 8 < 4 { 70 } else { 130 };
             [v, v, v, 255]
         });
-        correct(&mut img, LedBanding { enabled: true, preview: true, luminance: 100.0, color: 0.0, band_width: 8 });
+        correct(&mut img, LedBanding { enabled: true, luminance: 100.0, color: 0.0, band_width: 8 });
         let row_mean = |y: usize| img.row(y).iter().map(|p| p[0] as f32).sum::<f32>() / 64.0;
         assert!((row_mean(2) - row_mean(6)).abs() < 45.0);
     }
