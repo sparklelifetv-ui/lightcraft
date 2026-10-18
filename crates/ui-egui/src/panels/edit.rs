@@ -350,24 +350,20 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
             if ui.checkbox(&mut enabled, crate::i18n::tr("Enable automatic correction")).changed() {
                 let _ = app.run("develop.merge", json!({"settings": {"led_banding": {"enabled": enabled}}, "label": "LED Banding"}));
             }
-            let mut preview = d.led_banding.preview;
-            if ui.checkbox(&mut preview, crate::i18n::tr("Show corrected preview")).changed() {
-                let _ = app.run("develop.merge", json!({"settings": {"led_banding": {"preview": preview}}, "label": "LED Banding Preview"}));
-            }
             ui.add_space(4.0);
             let mut luminance = d.led_banding.luminance;
-            if ui.add_enabled(enabled && preview, egui::Slider::new(&mut luminance, 0.0..=100.0).text(crate::i18n::tr("Luminance"))).changed() {
+            if ui.add_enabled(enabled, egui::Slider::new(&mut luminance, 0.0..=100.0).text(crate::i18n::tr("Luminance"))).changed() {
                 let _ = app.run("develop.merge", json!({"settings": {"led_banding": {"luminance": luminance}}, "label": "LED Banding Luminance"}));
             }
             let mut color = d.led_banding.color;
-            if ui.add_enabled(enabled && preview, egui::Slider::new(&mut color, 0.0..=100.0).text(crate::i18n::tr("Colour"))).changed() {
+            if ui.add_enabled(enabled, egui::Slider::new(&mut color, 0.0..=100.0).text(crate::i18n::tr("Colour"))).changed() {
                 let _ = app.run("develop.merge", json!({"settings": {"led_banding": {"color": color}}, "label": "LED Banding Colour"}));
             }
             let mut band_width = d.led_banding.band_width as f64;
-            if ui.add_enabled(enabled && preview, egui::Slider::new(&mut band_width, 1.0..=64.0).step_by(1.0).text(crate::i18n::tr("Band width (px)"))).changed() {
+            if ui.add_enabled(enabled, egui::Slider::new(&mut band_width, 1.0..=64.0).step_by(1.0).text(crate::i18n::tr("Band width (px)"))).changed() {
                 let _ = app.run("develop.merge", json!({"settings": {"led_banding": {"band_width": band_width.round() as u32}}, "label": "LED Band Width"}));
             }
-            ui.label(egui::RichText::new(crate::i18n::tr("Use the preview checkbox to compare corrected and original rendering. Strong correction can alter real horizontal lighting gradients.")).size(11.0).color(Tokens::get(ui.ctx()).text_dim));
+            ui.label(egui::RichText::new(crate::i18n::tr("Use LightCraft's before/after comparison to inspect the correction. Strong correction can alter real horizontal lighting gradients.")).size(11.0).color(Tokens::get(ui.ctx()).text_dim));
         });
         ui.add_space(8.0);
     });
