@@ -128,6 +128,8 @@ pub struct DevelopSettings {
     pub vignette: Vignette,
     pub grain: Grain,
     pub detail: Detail,
+    /// Correct horizontal exposure/colour bands caused by flickering LED stage lighting.
+    pub led_banding: LedBanding,
     pub optics: Optics,
     pub geometry: Geometry,
     pub crop: Crop,
@@ -163,6 +165,7 @@ impl Default for DevelopSettings {
             vignette: Vignette::default(),
             grain: Grain::default(),
             detail: Detail::default(),
+            led_banding: LedBanding::default(),
             optics: Optics::default(),
             geometry: Geometry::default(),
             crop: Crop::default(),
@@ -175,6 +178,27 @@ impl Default for DevelopSettings {
             calibration: Calibration::default(),
             disabled_sections: Vec::new(),
         }
+    }
+}
+
+/// Non-destructive LED banding correction settings. Strengths are percentages; band width is a
+/// vertical smoothing radius in output pixels. Defaults are neutral and preserve existing renders.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LedBanding {
+    /// Run automatic horizontal-band estimation and correction.
+    pub enabled: bool,
+    /// Correct row-to-row luminance changes.
+    pub luminance: f64,
+    /// Correct row-to-row colour shifts.
+    pub color: f64,
+    /// Vertical radius used to estimate the slowly varying scene profile (1..64 px).
+    pub band_width: u32,
+}
+
+impl Default for LedBanding {
+    fn default() -> Self {
+        Self { enabled: false, luminance: 70.0, color: 50.0, band_width: 12 }
     }
 }
 
