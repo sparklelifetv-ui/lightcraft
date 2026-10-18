@@ -15,7 +15,9 @@ pub fn correct(image: &mut Rgba8, settings: LedBanding) {
     }
     let lum_strength = (settings.luminance / 100.0).clamp(0.0, 1.0) as f32;
     let color_strength = (settings.color / 100.0).clamp(0.0, 1.0) as f32;
-    let radius = (settings.band_width as usize).clamp(1, 64).min((h - 1) / 2).max(1);
+    // The control is the estimated half-width of a band. Smooth across several band widths
+    // so the target follows the underlying stage-light gradient rather than the stripe itself.
+    let radius = (settings.band_width as usize).saturating_mul(3).clamp(3, 192).min((h - 1) / 2).max(1);
     let mut lum = vec![0.0f32; h];
     let mut chroma = vec![[0.0f32; 3]; h];
     for y in 0..h {
@@ -52,11 +54,8 @@ pub fn correct(image: &mut Rgba8, settings: LedBanding) {
     for y in 0..h {
         let source_l = lum[y];
         let target_l = smooth_lum[y];
-        // Apply correction in log space with a stronger response at high slider values.
-        // The old linear interpolation often left visible LED stripes even at 100%.
         let l_gain = if source_l > 1.0 / 255.0 && target_l.is_finite() {
-            let ratio = (target_l / source_l).clamp(0.5, 2.0);
-            ratio.powf(lum_strength * 2.0).clamp(0.25, 4.0)
+            (1.0 + ((target_l / source_l).clamp(0.5, 2.0) - 1.0) * lum_strength).clamp(0.5, 2.0)
         } else { 1.0 };
         let mut gains = [1.0f32; 3];
         if color_strength > 0.0 {
@@ -64,8 +63,7 @@ pub fn correct(image: &mut Rgba8, settings: LedBanding) {
                 let src = chroma[y][k];
                 let target = smooth_ch[k][y];
                 if src > 2.0 / 255.0 && target.is_finite() {
-                    // Amplify the estimated channel correction too, while keeping it bounded.
-                    gains[k] = (target / src).clamp(0.7, 1.4).powf(color_strength * 1.8).clamp(0.5, 2.0);
+                    gains[k] = (1.0 + ((target / src).clamp(0.7, 1.4) - 1.0) * color_strength).clamp(0.7, 1.4);
                 }
             }
             // Colour correction should not double-apply luminance correction.
