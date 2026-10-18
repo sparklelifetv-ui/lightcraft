@@ -1,9 +1,9 @@
 //! Row-profile based correction for horizontal LED flicker/banding in rendered images.
 //!
 //! Operates on display-encoded RGBA output so it applies to JPEG-ready renders. It estimates a
-//! robust per-row luminance and chroma profile, smooths that profile vertically, then attenuates
-//! row deviations. This is a conservative single-frame heuristic: real horizontal stage lighting
-//! can resemble banding, so strengths are user-adjustable and the feature is off by default.
+//! per-row luminance and chroma profile, smooths that profile vertically, then corrects row
+//! deviations with a nonlinear strength curve. This is a single-frame heuristic: real horizontal
+//! stage lighting can resemble banding, so strengths are user-adjustable and the feature is off by default.
 use lightcraft_develop::LedBanding;
 use lightcraft_raster::Rgba8;
 
@@ -15,7 +15,9 @@ pub fn correct(image: &mut Rgba8, settings: LedBanding) {
     }
     let lum_strength = (settings.luminance / 100.0).clamp(0.0, 1.0) as f32;
     let color_strength = (settings.color / 100.0).clamp(0.0, 1.0) as f32;
-    let radius = (settings.band_width as usize).clamp(1, 64).min((h - 1) / 2).max(1);
+    // The control is the estimated half-width of a band. Smooth across several band widths
+    // so the target follows the underlying stage-light gradient rather than the stripe itself.
+    let radius = (settings.band_width as usize).saturating_mul(3).clamp(3, 192).min((h - 1) / 2).max(1);
     let mut lum = vec![0.0f32; h];
     let mut chroma = vec![[0.0f32; 3]; h];
     for y in 0..h {
