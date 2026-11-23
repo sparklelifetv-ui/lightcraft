@@ -1,7 +1,16 @@
-name: Build LED banding test app (Windows x64)
+name: Build LightCraft Windows x64 installer
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "crates/**"
+      - "apps/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "packaging/windows/**"
+      - ".github/workflows/build-windows-test.yml"
   push:
     branches: ["main"]
     paths:
@@ -43,7 +52,7 @@ jobs:
       - name: Upload Windows x64 build
         uses: actions/upload-artifact@v4
         with:
-          name: lightcraft-led-banding-windows-x64
+          name: lightcraft-sony-a9-metadata-windows-x64
           path: dist/release/*
           if-no-files-found: error
           retention-days: 14
