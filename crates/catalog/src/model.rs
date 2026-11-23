@@ -204,6 +204,9 @@ pub struct Meta {
     /// written to XMP. Left out of the catalog JSON when unknown, so older catalogs read unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus: Option<lightcraft_meta::FocusPoint>,
+    /// Sony Creative Style and WB fine-tune settings from the original file's MakerNote.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sony: Option<lightcraft_meta::SonySettings>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
