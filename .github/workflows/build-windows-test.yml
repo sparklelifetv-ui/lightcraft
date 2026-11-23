@@ -3,7 +3,7 @@ name: Build LightCraft Windows x64 installer
 on:
   workflow_dispatch:
   pull_request:
-    branches: ["main"]
+    branches: ["**"]
     paths:
       - "crates/**"
       - "apps/**"
