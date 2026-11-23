@@ -78,7 +78,17 @@ pub enum RegionKind {
     Other(String),
 }
 
-/// Everything LightCraft shows or searches about a photo. All fields are optional; unknown = `None`/empty.
+/// Sony in-camera rendering settings decoded from the Sony MakerNote.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct SonySettings {
+    pub creative_style: Option<String>,
+    pub contrast: Option<i32>,
+    pub saturation: Option<i32>,
+    pub sharpness: Option<i32>,
+    /// Normalized Sony A-B and G-M shift values in camera menu steps.
+    pub wb_shift_ab_gm: Option<[f64; 2]>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Metadata {
     // camera
@@ -110,6 +120,9 @@ pub struct Metadata {
     pub metering_mode: Option<u16>,
     /// Exif `WhiteBalance` (0 auto, 1 manual).
     pub white_balance: Option<u16>,
+    /// Sony-specific Creative Style and white-balance fine-tuning values, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sony: Option<SonySettings>,
     pub orientation: Option<Orientation>,
     pub gps: Option<Gps>,
     /// Pixel dimensions as recorded (not oriented).
@@ -182,6 +195,7 @@ impl Metadata {
             exposure_program,
             metering_mode,
             white_balance,
+            sony,
             orientation,
             gps,
             width,

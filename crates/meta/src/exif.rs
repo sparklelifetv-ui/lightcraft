@@ -19,6 +19,7 @@ pub fn try_read_exif(bytes: &[u8]) -> Result<Metadata, TiffError> {
     let data = strip_exif_header(bytes);
     let tiff = Tiff::parse(data)?;
     let mut m = from_tiff(&tiff);
+    m.sony = sony_settings(data, &tiff);
     // Panasonic writes no LensModel, only the name in its maker note (and in a RW2 that note is not in the raw's own Exif)
     if m.lens_model.is_none() {
         m.lens_model = panasonic_maker_note_lens(data, &tiff);
@@ -26,6 +27,44 @@ pub fn try_read_exif(bytes: &[u8]) -> Result<Metadata, TiffError> {
     // the maker note's values are offsets into the stream, which `from_tiff` doesn't have
     m.focus = crate::focus::read(data, &tiff, m.make.as_deref(), m.model.as_deref(), m.orientation);
     Ok(m)
+}
+
+/// Read Sony's documented MakerNote fields used by the Info camera card.
+/// The parser is bounded by the MakerNote IFD parser; unknown or malformed notes are ignored.
+fn sony_settings(data: &[u8], tiff: &Tiff) -> Option<crate::SonySettings> {
+    let exif = tiff.exif()?;
+    let entry = exif.get(t::MAKER_NOTE)?;
+    let make = tiff.ifds.first().and_then(|i| i.string(t::MAKE)).unwrap_or_default();
+    if !make.to_ascii_uppercase().contains("SONY") {
+        return None;
+    }
+    let note = lightcraft_tiff::makernote::parse_makernote(data, entry.offset, entry.count() as u64, tiff.order, &make)?;
+    if note.kind != lightcraft_tiff::makernote::MakerNoteKind::Sony {
+        return None;
+    }
+    let signed = |tag: u16, index: usize| -> Option<i32> {
+        i32::try_from(note.ifd.value(tag)?.get_i64(index)?).ok()
+    };
+    // Sony 0xB020 is ColorReproduction (the camera's named colour rendering, e.g. Standard/Vivid).
+    let creative_style = note.ifd.value(0xb020).and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+    // 0x2026 is the precise WB shift used by newer ILCE bodies: thousandths of a step
+    // (the A9 stores e.g. 2000 / 250 => A2 / M0.25). 0x2014 is the older whole-step field.
+    let wb_shift_ab_gm = if note.ifd.value(0x2026).is_some() {
+        Some([signed(0x2026, 0)? as f64 / 1000.0, signed(0x2026, 1)? as f64 / 1000.0])
+    } else if note.ifd.value(0x2014).is_some() {
+        Some([signed(0x2014, 0)? as f64, signed(0x2014, 1)? as f64])
+    } else {
+        None
+    };
+    let settings = crate::SonySettings {
+        creative_style,
+        contrast: signed(0x2004, 0),
+        saturation: signed(0x2005, 0),
+        sharpness: signed(0x2006, 0),
+        wb_shift_ab_gm,
+    };
+    (settings.creative_style.is_some() || settings.contrast.is_some() || settings.saturation.is_some()
+        || settings.sharpness.is_some() || settings.wb_shift_ab_gm.is_some()).then_some(settings)
 }
 
 fn text(ifd: Option<&Ifd>, tag: u16) -> Option<String> {
