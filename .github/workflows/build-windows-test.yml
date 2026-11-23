@@ -1,9 +1,9 @@
-name: Build LED banding test app (Windows x64)
+name: Build LightCraft Sony metadata update (Windows x64)
 
 on:
   workflow_dispatch:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/sony-basic-info-settings"]
     paths:
       - "crates/**"
       - "apps/**"
@@ -24,7 +24,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
-      - name: Check out merged source
+      - name: Check out Sony metadata source
         uses: actions/checkout@v4
 
       - name: Install Rust
@@ -43,7 +43,7 @@ jobs:
       - name: Upload Windows x64 build
         uses: actions/upload-artifact@v4
         with:
-          name: lightcraft-led-banding-windows-x64
+          name: lightcraft-sony-metadata-windows-x64
           path: dist/release/*
           if-no-files-found: error
           retention-days: 14
