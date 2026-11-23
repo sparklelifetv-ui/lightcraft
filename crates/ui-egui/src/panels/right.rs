@@ -857,6 +857,37 @@ fn camera_card(ui: &mut egui::Ui, p: &lightcraft_catalog::Photo) {
                 }
             });
         }
+        if let Some(sony) = m.sony.as_ref() {
+            let axis = |v: f64, positive: char, negative: char| -> String {
+                if !v.is_finite() || v.abs() < 0.005 { return "0".into(); }
+                let direction = if v > 0.0 { positive } else { negative };
+                let number = format!("{:.2}", v.abs());
+                let number = number.trim_end_matches('0').trim_end_matches('.');
+                format!("{direction}{number}")
+            };
+            let mut rows: Vec<(&str, String)> = Vec::new();
+            if let Some(style) = sony.creative_style.as_deref() {
+                rows.push(("Creative Style", style.to_string()));
+            }
+            if let Some(v) = sony.contrast { rows.push(("Contrast", v.to_string())); }
+            if let Some(v) = sony.saturation { rows.push(("Saturation", v.to_string())); }
+            if let Some(v) = sony.sharpness { rows.push(("Sharpness", v.to_string())); }
+            if let Some([ab, gm]) = sony.wb_shift_ab_gm {
+                rows.push(("WB Fine Tune (A-B)", axis(ab, 'A', 'B')));
+                rows.push(("WB Fine Tune (G-M)", axis(gm, 'M', 'G')));
+            }
+            if !rows.is_empty() {
+                ui.add_space(5.0);
+                ui.label(egui::RichText::new(crate::i18n::tr("In-camera settings")).size(11.0).color(t.text_dim));
+                egui::Grid::new("info-sony-settings").num_columns(2).spacing([24.0, 3.0]).show(ui, |ui| {
+                    for (k, v) in rows {
+                        ui.label(dim(crate::i18n::tr(k)));
+                        ui.label(dim(&v));
+                        ui.end_row();
+                    }
+                });
+            }
+        }
         // where the camera focused, and how (View ▸ Show Focus Point draws it): only when known; the
         // whole card's width, so "AF-C · Expanded Flexible Spot · Face tracking" fits
         if let Some(text) = focus_text(m.focus.as_ref()) {
