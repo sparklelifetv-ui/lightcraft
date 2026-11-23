@@ -19,6 +19,7 @@ pub fn try_read_exif(bytes: &[u8]) -> Result<Metadata, TiffError> {
     let data = strip_exif_header(bytes);
     let tiff = Tiff::parse(data)?;
     let mut m = from_tiff(&tiff);
+    m.sony = sony_settings(data, &tiff);
     // Panasonic writes no LensModel, only the name in its maker note (and in a RW2 that note is not in the raw's own Exif)
     if m.lens_model.is_none() {
         m.lens_model = panasonic_maker_note_lens(data, &tiff);
@@ -26,6 +27,37 @@ pub fn try_read_exif(bytes: &[u8]) -> Result<Metadata, TiffError> {
     // the maker note's values are offsets into the stream, which `from_tiff` doesn't have
     m.focus = crate::focus::read(data, &tiff, m.make.as_deref(), m.model.as_deref(), m.orientation);
     Ok(m)
+}
+
+/// Read Sony's documented MakerNote fields used by the Info camera card.
+/// The parser is bounded by the MakerNote IFD parser; unknown or malformed notes are ignored.
+fn sony_settings(data: &[u8], tiff: &Tiff) -> Option<crate::SonySettings> {
+    let exif = tiff.exif()?;
+    let entry = exif.get(t::MAKER_NOTE)?;
+    let make = tiff.ifds.first().and_then(|i| i.string(t::MAKE)).unwrap_or_default();
+    if !make.to_ascii_uppercase().contains("SONY") {
+        return None;
+    }
+    let note = lightcraft_tiff::makernote::parse_makernote(data, entry.offset, entry.count() as u64, tiff.order, &make)?;
+    if note.kind != lightcraft_tiff::makernote::MakerNoteKind::Sony {
+        return None;
+    }
+    let int = |tag: u16| -> Option<i32> {
+        i32::try_from(note.ifd.value(tag)?.get_i64(0)?).ok()
+    };
+    let creative_style = note.ifd.value(0xb020).and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+    let wb_shift_ab_gm = note.ifd.value(0x2014).and_then(|v| {
+        Some([i32::try_from(v.get_i64(0)?).ok()?, i32::try_from(v.get_i64(1)?).ok()?])
+    });
+    let settings = crate::SonySettings {
+        creative_style,
+        contrast: int(0x2004),
+        saturation: int(0x2005),
+        sharpness: int(0x2006),
+        wb_shift_ab_gm,
+    };
+    (settings.creative_style.is_some() || settings.contrast.is_some() || settings.saturation.is_some()
+        || settings.sharpness.is_some() || settings.wb_shift_ab_gm.is_some()).then_some(settings)
 }
 
 fn text(ifd: Option<&Ifd>, tag: u16) -> Option<String> {
