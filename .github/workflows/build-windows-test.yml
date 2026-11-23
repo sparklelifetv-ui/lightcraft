@@ -3,7 +3,7 @@ name: Build LightCraft Sony metadata update (Windows x64)
 on:
   workflow_dispatch:
   push:
-    branches: ["main", "upgrade/upstream-0.21.1-sony-a9"]
+    branches: ["**"]
     paths:
       - "crates/**"
       - "apps/**"
