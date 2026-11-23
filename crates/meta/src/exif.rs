@@ -277,6 +277,53 @@ pub(crate) mod tests {
         build(at)
     }
 
+    /// A minimal Sony DSC MakerNote with the same relevant tag layout as the ILCE-9 sample.
+    /// MakerNote value offsets are relative to the enclosing TIFF header, as Sony writes them.
+    fn sony_exif() -> Vec<u8> {
+        fn u16le(v: &mut Vec<u8>, n: u16) { v.extend_from_slice(&n.to_le_bytes()); }
+        fn u32le(v: &mut Vec<u8>, n: u32) { v.extend_from_slice(&n.to_le_bytes()); }
+        let note_len = 92usize;
+        let build = |note: Vec<u8>| {
+            let mut exif = IfdBuilder::new();
+            exif.set(t::MAKER_NOTE, Value::Undefined(note));
+            let mut ifd0 = IfdBuilder::new();
+            ifd0.set(t::MAKE, Value::Ascii("SONY".into()));
+            ifd0.set(t::MODEL, Value::Ascii("ILCE-9".into()));
+            ifd0.set_child(t::EXIF_IFD, exif);
+            TiffWriter::new(ByteOrder::Little, false).write(&[ifd0]).unwrap()
+        };
+        let placeholder = build(vec![0; note_len]);
+        let note_at = Tiff::parse(&placeholder).unwrap().exif().unwrap().get(t::MAKER_NOTE).unwrap().offset as usize;
+        let mut note = b"SONY DSC \0\0\0".to_vec();
+        u16le(&mut note, 5);
+        // Contrast, Saturation, Sharpness: signed LONG, one value each.
+        for (tag, value) in [(0x2004u16, 0i32), (0x2005, 0), (0x2006, 1)] {
+            u16le(&mut note, tag); u16le(&mut note, 9); u32le(&mut note, 1); u32le(&mut note, value as u32);
+        }
+        // WBShiftAB_GM_Precise: signed LONG[2], stored after the IFD.
+        let values_at = note_at + 12 + 2 + 5 * 12 + 4;
+        u16le(&mut note, 0x2026); u16le(&mut note, 9); u32le(&mut note, 2); u32le(&mut note, values_at as u32);
+        // ColorReproduction / Creative Style string.
+        let style_at = values_at + 8;
+        u16le(&mut note, 0xb020); u16le(&mut note, 2); u32le(&mut note, 6); u32le(&mut note, style_at as u32);
+        u32le(&mut note, 0); // next IFD
+        u32le(&mut note, 2000); u32le(&mut note, 250);
+        note.extend_from_slice(b"Vivid\0");
+        assert_eq!(note.len(), note_len);
+        build(note)
+    }
+
+    #[test]
+    fn sony_ilce9_creative_style_and_precise_white_balance_are_decoded() {
+        let m = read_exif(&sony_exif());
+        let sony = m.sony.expect("Sony MakerNote settings");
+        assert_eq!(sony.creative_style.as_deref(), Some("Vivid"));
+        assert_eq!(sony.contrast, Some(0));
+        assert_eq!(sony.saturation, Some(0));
+        assert_eq!(sony.sharpness, Some(1));
+        assert_eq!(sony.wb_shift_ab_gm, Some([2.0, 0.25]));
+    }
+
     #[test]
     fn panasonic_maker_note_names_the_lens() {
         for order in [ByteOrder::Little, ByteOrder::Big] {
