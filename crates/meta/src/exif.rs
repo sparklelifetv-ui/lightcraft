@@ -1,5 +1,5 @@
 use crate::convert::{from_craft, to_craft};
-use crate::{Metadata, Orientation};
+use crate::{Metadata, Orientation, SonySettings};
 use craft_tiff::{ParseOptions, Tiff, TiffError};
 
 pub fn strip_exif_header(b: &[u8]) -> &[u8] {
@@ -7,15 +7,61 @@ pub fn strip_exif_header(b: &[u8]) -> &[u8] {
 }
 
 pub fn read_exif(bytes: &[u8]) -> Metadata {
-    from_craft(craft_metadata::read_exif(bytes))
+    try_read_exif(bytes).unwrap_or_default()
 }
 
 pub fn try_read_exif(bytes: &[u8]) -> Result<Metadata, TiffError> {
-    craft_metadata::try_read_exif(bytes).map(from_craft)
+    let mut m = craft_metadata::try_read_exif(bytes).map(from_craft)?;
+    let data = strip_exif_header(bytes);
+    if let Ok(tiff) = Tiff::parse(data) {
+        m.sony = sony_settings(data, &tiff);
+    }
+    Ok(m)
 }
 
 pub fn try_read_exif_with(bytes: &[u8], opts: &ParseOptions) -> Result<Metadata, TiffError> {
-    craft_metadata::try_read_exif_with(bytes, opts).map(from_craft)
+    let mut m = craft_metadata::try_read_exif_with(bytes, opts).map(from_craft)?;
+    let data = strip_exif_header(bytes);
+    if let Ok(tiff) = Tiff::parse(data) {
+        m.sony = sony_settings(data, &tiff);
+    }
+    Ok(m)
+}
+
+/// Decode the Sony MakerNote fields shown in the Info camera card.
+/// MakerNote offsets are relative to the enclosing TIFF buffer, so this needs both bytes and the parsed IFDs.
+fn sony_settings(data: &[u8], tiff: &Tiff) -> Option<SonySettings> {
+    use craft_tiff::{makernote::{MakerNoteKind, parse_makernote}, tags as t};
+    let exif = tiff.exif()?;
+    let entry = exif.get(t::MAKER_NOTE)?;
+    let make = tiff.ifds.first().and_then(|i| i.string(t::MAKE)).unwrap_or_default();
+    if !make.to_ascii_uppercase().contains("SONY") {
+        return None;
+    }
+    let note = parse_makernote(data, entry.offset, entry.count() as u64, tiff.order, &make)?;
+    if note.kind != MakerNoteKind::Sony {
+        return None;
+    }
+    let signed = |tag: u16, index: usize| -> Option<i32> {
+        i32::try_from(note.ifd.value(tag)?.get_i64(index)?).ok()
+    };
+    let creative_style = note.ifd.value(0xB020).and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+    let wb_shift_ab_gm = if note.ifd.value(0x2026).is_some() {
+        Some([signed(0x2026, 0)? as f64 / 1000.0, signed(0x2026, 1)? as f64 / 1000.0])
+    } else if note.ifd.value(0x2014).is_some() {
+        Some([signed(0x2014, 0)? as f64, signed(0x2014, 1)? as f64])
+    } else {
+        None
+    };
+    let settings = SonySettings {
+        creative_style,
+        contrast: signed(0x2004, 0),
+        saturation: signed(0x2005, 0),
+        sharpness: signed(0x2006, 0),
+        wb_shift_ab_gm,
+    };
+    (settings.creative_style.is_some() || settings.contrast.is_some() || settings.saturation.is_some()
+        || settings.sharpness.is_some() || settings.wb_shift_ab_gm.is_some()).then_some(settings)
 }
 
 pub fn from_tiff(tiff: &Tiff) -> Metadata {
