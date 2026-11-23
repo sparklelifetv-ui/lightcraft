@@ -87,7 +87,7 @@ pub struct SonySettings {
     pub saturation: Option<i32>,
     pub sharpness: Option<i32>,
     /// Sony WBShiftAB_GM values: A-B steps and G-M hundredths of a step.
-    pub wb_shift_ab_gm: Option<[i32; 2]>,
+    pub wb_shift_ab_gm: Option<[f64; 2]>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
