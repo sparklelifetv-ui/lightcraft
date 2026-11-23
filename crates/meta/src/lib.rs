@@ -78,7 +78,6 @@ pub enum RegionKind {
     Other(String),
 }
 
-/// Everything LightCraft shows or searches about a photo. All fields are optional; unknown = `None`/empty.
 /// Sony in-camera rendering settings decoded from the Sony MakerNote.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SonySettings {
@@ -86,7 +85,7 @@ pub struct SonySettings {
     pub contrast: Option<i32>,
     pub saturation: Option<i32>,
     pub sharpness: Option<i32>,
-    /// Sony WBShiftAB_GM values: A-B steps and G-M hundredths of a step.
+    /// Normalized Sony A-B and G-M shift values in camera menu steps.
     pub wb_shift_ab_gm: Option<[f64; 2]>,
 }
 
