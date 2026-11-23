@@ -42,18 +42,25 @@ fn sony_settings(data: &[u8], tiff: &Tiff) -> Option<crate::SonySettings> {
     if note.kind != lightcraft_tiff::makernote::MakerNoteKind::Sony {
         return None;
     }
-    let int = |tag: u16| -> Option<i32> {
-        i32::try_from(note.ifd.value(tag)?.get_i64(0)?).ok()
+    let signed = |tag: u16, index: usize| -> Option<i32> {
+        i32::try_from(note.ifd.value(tag)?.get_i64(index)?).ok()
     };
+    // Sony 0xB020 is ColorReproduction (the camera's named colour rendering, e.g. Standard/Vivid).
     let creative_style = note.ifd.value(0xb020).and_then(|v| v.as_str()).filter(|s| !s.is_empty());
-    let wb_shift_ab_gm = note.ifd.value(0x2014).and_then(|v| {
-        Some([i32::try_from(v.get_i64(0)?).ok()?, i32::try_from(v.get_i64(1)?).ok()?])
-    });
+    // 0x2026 is the precise WB shift used by newer ILCE bodies: thousandths of a step
+    // (the A9 stores e.g. 2000 / 250 => A2 / M0.25). 0x2014 is the older whole-step field.
+    let wb_shift_ab_gm = if note.ifd.value(0x2026).is_some() {
+        Some([signed(0x2026, 0)? as f64 / 1000.0, signed(0x2026, 1)? as f64 / 1000.0])
+    } else if note.ifd.value(0x2014).is_some() {
+        Some([signed(0x2014, 0)? as f64, signed(0x2014, 1)? as f64])
+    } else {
+        None
+    };
     let settings = crate::SonySettings {
         creative_style,
-        contrast: int(0x2004),
-        saturation: int(0x2005),
-        sharpness: int(0x2006),
+        contrast: signed(0x2004, 0),
+        saturation: signed(0x2005, 0),
+        sharpness: signed(0x2006, 0),
         wb_shift_ab_gm,
     };
     (settings.creative_style.is_some() || settings.contrast.is_some() || settings.saturation.is_some()
